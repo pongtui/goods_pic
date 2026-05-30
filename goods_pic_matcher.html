@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>商品取图规则匹配工具</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: #f0f2f5;
+  color: #333;
+  min-height: 100vh;
+}
+
+.header {
+  background: linear-gradient(135deg, #1a73e8, #1557b0);
+  color: #fff;
+  padding: 20px 32px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.header h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.header .subtitle {
+  font-size: 13px;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.panel {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 14px 20px;
+  background: #fafbfc;
+  border-bottom: 1px solid #e8eaed;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a73e8;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-header .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.panel-body {
+  padding: 16px 20px;
+}
+
+textarea {
+  width: 100%;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-family: "SF Mono", "Consolas", "Monaco", "Microsoft YaHei", monospace;
+  line-height: 1.6;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #fafbfc;
+}
+
+textarea:focus {
+  border-color: #1a73e8;
+  box-shadow: 0 0 0 2px rgba(26,115,232,0.15);
+  background: #fff;
+}
+
+#jsonInput {
+  height: 320px;
+}
+
+#imageNamesInput {
+  height: 320px;
+}
+
+.hint {
+  font-size: 11px;
+  color: #999;
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+.btn-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.btn {
+  padding: 10px 28px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-primary {
+  background: #1a73e8;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #1557b0;
+  box-shadow: 0 2px 8px rgba(26,115,232,0.3);
+}
+
+.btn-secondary {
+  background: #fff;
+  color: #5f6368;
+  border: 1px solid #dadce0;
+}
+
+.btn-secondary:hover {
+  background: #f1f3f4;
+}
+
+.result-section {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.result-header {
+  padding: 14px 20px;
+  background: #fafbfc;
+  border-bottom: 1px solid #e8eaed;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.result-badge {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.result-badge.success { background: #e6f4ea; color: #137333; }
+.result-badge.fail { background: #fce8e6; color: #c5221f; }
+.result-badge.info { background: #e8f0fe; color: #1967d2; }
+
+.result-body {
+  padding: 20px;
+}
+
+.final-image {
+  background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+  border: 2px solid #81c784;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+}
+
+.final-image .label {
+  font-size: 12px;
+  color: #2e7d32;
+  font-weight: 600;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.final-image .name {
+  font-size: 15px;
+  color: #1b5e20;
+  font-family: "SF Mono", "Consolas", "Monaco", "Microsoft YaHei", monospace;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+.final-image .no-result {
+  font-size: 15px;
+  color: #c62828;
+  font-weight: 600;
+}
+
+.step-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.step-table th {
+  text-align: left;
+  padding: 10px 12px;
+  background: #f8f9fa;
+  border-bottom: 2px solid #e8eaed;
+  font-weight: 600;
+  color: #5f6368;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.step-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f3f4;
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+.step-table tr:hover td {
+  background: #f8f9fa;
+}
+
+.step-table .step-label {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.step-label.pass { background: #e8f5e9; color: #2e7d32; }
+.step-label.fail { background: #ffebee; color: #c62828; }
+.step-label.skip { background: #f5f5f5; color: #9e9e9e; }
+
+.model-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.model-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: "SF Mono", "Consolas", monospace;
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.model-chip.extra {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.model-chip.missing {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.match-keyword { color: #1a73e8; font-weight: 500; }
+.match-score { font-weight: 600; }
+
+.error-msg {
+  background: #fce8e6;
+  border: 1px solid #f5c6cb;
+  border-radius: 6px;
+  padding: 12px 16px;
+  color: #c5221f;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+  font-size: 14px;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+  .container {
+    padding: 16px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📦 商品取图规则匹配工具</h1>
+  <div class="subtitle">根据取图参数与规则，从图片名称列表中匹配最佳图片 <span style="background:#ffffff33;padding:1px 6px;border-radius:4px;font-size:11px;margin-left:6px;">v1.5</span></div>
+</div>
+
+<div class="container">
+
+  <div class="panel-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2l5 5h-5V4zM8 13h8v2H8v-2zm0 4h8v2H8v-2zm0-8h3v2H8V9z"/></svg>
+        取图参数（JSON）
+      </div>
+      <div class="panel-body">
+        <textarea id="jsonInput" placeholder='{
+  "渠道": "天猫",
+  "销售类目": "家具",
+  "图片类型": "sku小图",
+  "型号": "RQ3R-A, LS387S10-D",
+  "颜色": "实木面",
+  "功能": "伸缩",
+  "规格": "1.3m",
+  "子项": [
+    { "名称": "餐桌", "数量": "1", "张数": "2" },
+    { "名称": "餐椅", "数量": "4", "张数": "2" }
+  ]
+}'></textarea>
+        <div class="hint">支持字段：渠道、销售类目、图片类型、型号、颜色、功能、规格、子项（数组）</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h16v2H4v-2z"/></svg>
+        图片名称（每行一个）
+      </div>
+      <div class="panel-body">
+        <textarea id="imageNamesInput" placeholder="RQ3R-A组合-主图-实木面-SKU-(1).jpg
+RQ3R-A组合-主图-1.3m伸缩餐桌-实木面+LS387S10-D餐椅x4-SKU-(1).jpg
+RQ3R-A组合-主图-1.3m伸缩餐桌-实木面-SKU-(2).jpg
+RQ3R-B组合-主图-1.3m伸缩餐桌-实木面+LS387S10-D餐椅x4-SKU-(1).jpg
+RQ3R-A细节-1.3m伸缩餐桌-实木面-SKU-(3).jpg"></textarea>
+        <div class="hint">多个图片名称请换行输入，空行会被自动忽略</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="doMatch()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      开始匹配
+    </button>
+    <button class="btn btn-secondary" onclick="clearAll()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+      清空
+    </button>
+    <button class="btn btn-secondary" onclick="loadExample()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>
+      加载示例
+    </button>
+  </div>
+
+  <div class="result-section" id="resultSection">
+    <div class="result-header">
+      匹配结果
+      <span class="result-badge info" id="resultBadge">等待匹配</span>
+    </div>
+    <div class="result-body" id="resultBody">
+      <div class="empty-state">请输入取图参数和图片名称后，点击"开始匹配"</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// v1.5 - 连字符前允许 [A-Z]* 结尾（如 RQ3R-A 中 R 在 - 前）
+const MODEL_PATTERN = /[A-Z]{2,}\d+([A-Z]*\d+)*[A-Z]*-[A-Z\d]+/gi;
+
+window._MODEL_PATTERN_VERSION = 'v1.5';
+
+function extractModels(text) {
+  const matches = text.match(MODEL_PATTERN);
+  if (!matches) return [];
+  return [...new Set(matches)];
+}
+
+function normalizeModels(models) {
+  return models.map(m => m.toUpperCase()).sort();
+}
+
+function keywordMatch(text, keywords) {
+  if (!keywords || !keywords.trim()) return 0;
+  const kwList = keywords.split(/[,，、\s]+/).filter(k => k.trim());
+  let score = 0;
+  for (const kw of kwList) {
+    if (text.toLowerCase().includes(kw.toLowerCase())) {
+      score++;
+    }
+  }
+  return score;
+}
+
+function doMatch() {
+  const jsonStr = document.getElementById('jsonInput').value.trim();
+  const imageNamesStr = document.getElementById('imageNamesInput').value.trim();
+  const resultBody = document.getElementById('resultBody');
+  const resultBadge = document.getElementById('resultBadge');
+
+  if (!jsonStr) {
+    resultBody.innerHTML = '<div class="error-msg">请先输入取图参数（JSON）</div>';
+    resultBadge.textContent = '参数缺失';
+    resultBadge.className = 'result-badge fail';
+    return;
+  }
+
+  if (!imageNamesStr) {
+    resultBody.innerHTML = '<div class="error-msg">请先输入图片名称</div>';
+    resultBadge.textContent = '参数缺失';
+    resultBadge.className = 'result-badge fail';
+    return;
+  }
+
+  let params;
+  try {
+    params = JSON.parse(jsonStr);
+  } catch (e) {
+    resultBody.innerHTML = '<div class="error-msg">JSON 格式错误：' + e.message + '</div>';
+    resultBadge.textContent = 'JSON错误';
+    resultBadge.className = 'result-badge fail';
+    return;
+  }
+
+  const imageNames = imageNamesStr.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0);
+
+  if (imageNames.length === 0) {
+    resultBody.innerHTML = '<div class="error-msg">未解析到有效的图片名称</div>';
+    resultBadge.textContent = '无图片';
+    resultBadge.className = 'result-badge fail';
+    return;
+  }
+
+  const steps = [];
+  let candidates = [...imageNames];
+  const totalImages = candidates.length;
+
+  // Step 1: 图片类型=sku小图
+  const picType = (params['图片类型'] || '').trim();
+  if (picType) {
+    steps.push({
+      step: '第1步：图片类型过滤',
+      detail: '要求图片类型 = "' + picType + '"',
+      beforeCount: candidates.length,
+      note: '当前规则版本中，图片类型仅作记录，不直接用于图片名称过滤（图片类型通常不在图片名称中体现）。如需基于图片类型的过滤逻辑，请在规则优化中补充。'
+    });
+  } else {
+    steps.push({
+      step: '第1步：图片类型过滤',
+      detail: '未指定图片类型，跳过此步骤',
+      beforeCount: candidates.length,
+      note: ''
+    });
+  }
+
+  // Step 2: 型号完全对应
+  const inputModel = (params['型号'] || '').trim();
+  const inputModels = [];
+  if (inputModel) inputModels.push(...inputModel.split(/[,，、\s]+/).filter(m => m.trim()));
+  const inputModelsNorm = normalizeModels(inputModels.map(m => m.trim()));
+
+  const modelResults = [];
+  if (inputModelsNorm.length > 0) {
+    console.log('[取图匹配 v1.5] 入参型号:', inputModelsNorm);
+    for (const name of candidates) {
+      const imgModels = extractModels(name);
+      const imgModelsNorm = normalizeModels(imgModels);
+      console.log('[取图匹配 v1.5] 图片:', name, '→ 提取型号:', imgModelsNorm);
+
+      const missingModels = inputModelsNorm.filter(m => !imgModelsNorm.includes(m));
+      const extraModels = imgModelsNorm.filter(m => !inputModelsNorm.includes(m));
+      const isExactMatch = missingModels.length === 0 && extraModels.length === 0;
+
+      modelResults.push({
+        name: name,
+        imgModels: imgModelsNorm,
+        missingModels: missingModels,
+        extraModels: extraModels,
+        isMatch: isExactMatch
+      });
+    }
+
+    const matchedByModel = modelResults.filter(r => r.isMatch).map(r => r.name);
+    candidates = matchedByModel;
+
+    const detailLines = [];
+    detailLines.push('入参型号：' + (inputModelsNorm.length > 0 ? inputModelsNorm.join('、') : '无'));
+    detailLines.push('完全对应规则：图片名称中的型号必须与入参型号完全一致（不多不少）');
+
+    steps.push({
+      step: '第2步：型号完全对应过滤',
+      detail: detailLines.join('<br>'),
+      beforeCount: totalImages,
+      afterCount: candidates.length,
+      modelResults: modelResults
+    });
+  } else {
+    steps.push({
+      step: '第2步：型号完全对应过滤',
+      detail: '未指定型号，跳过此步骤',
+      beforeCount: candidates.length,
+      modelResults: []
+    });
+  }
+
+  // Step 3: 颜色、功能、规格关键词匹配打分
+  const color = (params['颜色'] || '').trim();
+  const func = (params['功能'] || '').trim();
+  const spec = (params['规格'] || '').trim();
+
+  let finalImage = null;
+  let scoringResults = [];
+
+  if (candidates.length > 0 && (color || func || spec)) {
+    let maxScore = -1;
+    for (const name of candidates) {
+      let score = 0;
+      const matchedKeywords = [];
+      if (color) {
+        const s = keywordMatch(name, color);
+        if (s > 0) matchedKeywords.push('颜色:' + color + '(' + s + '分)');
+        score += s;
+      }
+      if (func) {
+        const s = keywordMatch(name, func);
+        if (s > 0) matchedKeywords.push('功能:' + func + '(' + s + '分)');
+        score += s;
+      }
+      if (spec) {
+        const s = keywordMatch(name, spec);
+        if (s > 0) matchedKeywords.push('规格:' + spec + '(' + s + '分)');
+        score += s;
+      }
+      scoringResults.push({ name, score, matchedKeywords });
+      if (score > maxScore) {
+        maxScore = score;
+        finalImage = name;
+      }
+    }
+
+    const detailLines = [];
+    if (color) detailLines.push('颜色关键词：' + color);
+    if (func) detailLines.push('功能关键词：' + func);
+    if (spec) detailLines.push('规格关键词：' + spec);
+    detailLines.push('计分规则：每匹配中1个关键词得1分，取最高分图片');
+
+    steps.push({
+      step: '第3步：颜色/功能/规格关键词匹配打分',
+      detail: detailLines.join('<br>'),
+      beforeCount: candidates.length,
+      scoringResults: scoringResults,
+      maxScore: maxScore
+    });
+  } else if (candidates.length === 0) {
+    steps.push({
+      step: '第3步：颜色/功能/规格关键词匹配打分',
+      detail: '无候选图片进入此步骤',
+      beforeCount: 0,
+      scoringResults: []
+    });
+    finalImage = null;
+  } else if (candidates.length > 0 && candidates.length === 1) {
+    finalImage = candidates[0];
+    steps.push({
+      step: '第3步：颜色/功能/规格关键词匹配打分',
+      detail: '仅剩1张候选图片，无需打分，直接返回',
+      beforeCount: 1,
+      scoringResults: [{ name: candidates[0], score: '-', matchedKeywords: ['唯一候选'] }]
+    });
+  } else {
+    finalImage = candidates[candidates.length - 1];
+    steps.push({
+      step: '第3步：颜色/功能/规格关键词匹配打分',
+      detail: '未指定颜色/功能/规格关键词，返回最后一张候选图片',
+      beforeCount: candidates.length,
+      scoringResults: candidates.map(n => ({ name: n, score: '-', matchedKeywords: ['未打分'] }))
+    });
+  }
+
+  // Step 4: 结果判定
+  if (!finalImage) {
+    finalImage = '无';
+  }
+
+  steps.push({
+    step: '第4步：最终结果',
+    detail: finalImage === '无' ? '未匹配到符合规则的图片，返回"无"' : '匹配成功，返回最佳图片名称',
+    finalImage: finalImage
+  });
+
+  // Render results
+  renderResults(steps, finalImage, resultBody, resultBadge);
+}
+
+function renderResults(steps, finalImage, resultBody, resultBadge) {
+  let html = '';
+
+  if (finalImage && finalImage !== '无') {
+    html += '<div class="final-image">';
+    html += '<div class="label">✅ 最终匹配图片</div>';
+    html += '<div class="name">' + escapeHtml(finalImage) + '</div>';
+    html += '</div>';
+  } else {
+    html += '<div class="final-image" style="background:linear-gradient(135deg,#fce4ec,#ffebee);border-color:#ef9a9a;">';
+    html += '<div class="label">❌ 匹配结果</div>';
+    html += '<div class="no-result">无</div>';
+    html += '</div>';
+  }
+
+  html += '<table class="step-table"><thead><tr>';
+  html += '<th style="width:220px;">步骤</th>';
+  html += '<th style="width:300px;">规则说明</th>';
+  html += '<th>匹配详情</th>';
+  html += '</tr></thead><tbody>';
+
+  for (const step of steps) {
+    html += '<tr>';
+    html += '<td><strong>' + escapeHtml(step.step) + '</strong></td>';
+    html += '<td style="font-size:12px;">' + step.detail + '</td>';
+
+    html += '<td>';
+    if (step.modelResults && step.modelResults.length > 0) {
+      const passCount = step.modelResults.filter(r => r.isMatch).length;
+      const failCount = step.modelResults.length - passCount;
+      html += '<div style="margin-bottom:8px;">';
+      html += '<span class="step-label pass">通过 ' + passCount + '</span> ';
+      html += '<span class="step-label fail">淘汰 ' + failCount + '</span>';
+      html += '</div>';
+
+      for (const mr of step.modelResults) {
+        if (mr.isMatch) {
+          html += '<div style="margin-bottom:6px;font-size:12px;">';
+          html += '<span class="step-label pass">✓</span> ';
+          html += '<span style="word-break:break-all;">' + escapeHtml(mr.name) + '</span>';
+          html += '<div class="model-chips" style="margin-top:4px;">';
+          for (const m of mr.imgModels) {
+            html += '<span class="model-chip">' + escapeHtml(m) + '</span>';
+          }
+          html += '</div>';
+          html += '</div>';
+        } else {
+          html += '<div style="margin-bottom:6px;font-size:12px;">';
+          html += '<span class="step-label fail">✗</span> ';
+          html += '<span style="word-break:break-all;color:#999;">' + escapeHtml(mr.name) + '</span>';
+          html += '<div class="model-chips" style="margin-top:4px;">';
+          for (const m of mr.imgModels) {
+            html += '<span class="model-chip">' + escapeHtml(m) + '</span>';
+          }
+          if (mr.missingModels.length > 0) {
+            for (const m of mr.missingModels) {
+              html += '<span class="model-chip missing">缺:' + escapeHtml(m) + '</span>';
+            }
+          }
+          if (mr.extraModels.length > 0) {
+            for (const m of mr.extraModels) {
+              html += '<span class="model-chip extra">多:' + escapeHtml(m) + '</span>';
+            }
+          }
+          html += '</div>';
+          html += '</div>';
+        }
+      }
+    }
+
+    if (step.scoringResults && step.scoringResults.length > 0) {
+      for (const sr of step.scoringResults) {
+        const isBest = sr.name === finalImage;
+        html += '<div style="margin-bottom:4px;font-size:12px;' + (isBest ? 'font-weight:600;' : '') + '">';
+        html += isBest ? '<span class="step-label pass">★</span> ' : '<span style="color:#ccc;">○</span> ';
+        html += '<span style="word-break:break-all;">' + escapeHtml(sr.name) + '</span>';
+        if (sr.score !== undefined && sr.score !== '-') {
+          html += ' <span class="match-score">得分:' + sr.score + '</span>';
+        }
+        if (sr.matchedKeywords && sr.matchedKeywords.length > 0) {
+          html += '<div style="margin-top:2px;color:#888;">';
+          html += sr.matchedKeywords.map(k => '<span class="match-keyword">' + escapeHtml(k) + '</span>').join(' / ');
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+    }
+
+    if (step.finalImage) {
+      html += '<strong style="font-size:14px;">' + escapeHtml(step.finalImage) + '</strong>';
+    }
+
+    if (!step.modelResults && !step.scoringResults && !step.finalImage) {
+      html += '<span style="color:#999;">-</span>';
+    }
+
+    html += '</td>';
+    html += '</tr>';
+  }
+
+  html += '</tbody></table>';
+
+  resultBody.innerHTML = html;
+
+  if (finalImage && finalImage !== '无') {
+    resultBadge.textContent = '匹配成功';
+    resultBadge.className = 'result-badge success';
+  } else {
+    resultBadge.textContent = '无匹配结果';
+    resultBadge.className = 'result-badge fail';
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function clearAll() {
+  document.getElementById('jsonInput').value = '';
+  document.getElementById('imageNamesInput').value = '';
+  document.getElementById('resultBody').innerHTML = '<div class="empty-state">请输入取图参数和图片名称后，点击"开始匹配"</div>';
+  document.getElementById('resultBadge').textContent = '等待匹配';
+  document.getElementById('resultBadge').className = 'result-badge info';
+}
+
+function loadExample() {
+  document.getElementById('jsonInput').value = JSON.stringify({
+    "渠道": "天猫",
+    "销售类目": "家具",
+    "图片类型": "sku小图",
+    "型号": "RQ3R-A, LS387S10-D",
+    "颜色": "实木面",
+    "功能": "伸缩",
+    "规格": "1.3m",
+    "子项": [
+      { "名称": "餐桌", "数量": "1", "张数": "2" },
+      { "名称": "餐椅", "数量": "4", "张数": "2" }
+    ]
+  }, null, 2);
+
+  document.getElementById('imageNamesInput').value = [
+    "RQ3R-A组合-主图-实木面-SKU-(1).jpg",
+    "RQ3R-A组合-主图-1.3m伸缩餐桌-实木面+LS387S10-D餐椅x4-SKU-(1).jpg",
+    "RQ3R-A组合-主图-1.3m伸缩餐桌-实木面-SKU-(2).jpg",
+    "RQ3R-B组合-主图-1.3m伸缩餐桌-实木面+LS387S10-D餐椅x4-SKU-(1).jpg",
+    "RQ3R-A细节-1.3m伸缩餐桌-实木面-SKU-(3).jpg",
+    "RQ3R-A组合-主图-1.3m伸缩餐桌-大理石面+LS387S10-D餐椅x4-SKU-(1).jpg",
+    "RQ3R-A+LS387S10-D-白图-SKU-(1).jpg"
+  ].join('\n');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  loadExample();
+});
+</script>
+
+</body>
+</html>
