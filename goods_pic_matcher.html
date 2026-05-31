@@ -318,6 +318,7 @@ textarea:focus {
   }
 }
 </style>
+<script src="goods_pic_matcher.js"></script>
 </head>
 <body>
 
@@ -396,38 +397,13 @@ RQ3R-A细节-1.3m伸缩餐桌-实木面-SKU-(3).jpg"></textarea>
 </div>
 
 <script>
-// v1.5 - 连字符前允许 [A-Z]* 结尾（如 RQ3R-A 中 R 在 - 前）
-const MODEL_PATTERN = /[A-Z]{2,}\d+([A-Z]*\d+)*[A-Z]*-[A-Z\d]+/gi;
-
-window._MODEL_PATTERN_VERSION = 'v1.5';
-
-function extractModels(text) {
-  const matches = text.match(MODEL_PATTERN);
-  if (!matches) return [];
-  return [...new Set(matches)];
-}
-
-function normalizeModels(models) {
-  return models.map(m => m.toUpperCase()).sort();
-}
-
-function keywordMatch(text, keywords) {
-  if (!keywords || !keywords.trim()) return 0;
-  const kwList = keywords.split(/[,，、\s]+/).filter(k => k.trim());
-  let score = 0;
-  for (const kw of kwList) {
-    if (text.toLowerCase().includes(kw.toLowerCase())) {
-      score++;
-    }
-  }
-  return score;
-}
+var M = GoodsPicMatcher;
 
 function doMatch() {
-  const jsonStr = document.getElementById('jsonInput').value.trim();
-  const imageNamesStr = document.getElementById('imageNamesInput').value.trim();
-  const resultBody = document.getElementById('resultBody');
-  const resultBadge = document.getElementById('resultBadge');
+  var jsonStr = document.getElementById('jsonInput').value.trim();
+  var imageNamesStr = document.getElementById('imageNamesInput').value.trim();
+  var resultBody = document.getElementById('resultBody');
+  var resultBadge = document.getElementById('resultBadge');
 
   if (!jsonStr) {
     resultBody.innerHTML = '<div class="error-msg">请先输入取图参数（JSON）</div>';
@@ -443,7 +419,7 @@ function doMatch() {
     return;
   }
 
-  let params;
+  var params;
   try {
     params = JSON.parse(jsonStr);
   } catch (e) {
@@ -453,9 +429,9 @@ function doMatch() {
     return;
   }
 
-  const imageNames = imageNamesStr.split('\n')
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
+  var imageNames = imageNamesStr.split('\n')
+    .map(function(l) { return l.trim(); })
+    .filter(function(l) { return l.length > 0; });
 
   if (imageNames.length === 0) {
     resultBody.innerHTML = '<div class="error-msg">未解析到有效的图片名称</div>';
@@ -464,169 +440,13 @@ function doMatch() {
     return;
   }
 
-  const steps = [];
-  let candidates = [...imageNames];
-  const totalImages = candidates.length;
-
-  // Step 1: 图片类型=sku小图
-  const picType = (params['图片类型'] || '').trim();
-  if (picType) {
-    steps.push({
-      step: '第1步：图片类型过滤',
-      detail: '要求图片类型 = "' + picType + '"',
-      beforeCount: candidates.length,
-      note: '当前规则版本中，图片类型仅作记录，不直接用于图片名称过滤（图片类型通常不在图片名称中体现）。如需基于图片类型的过滤逻辑，请在规则优化中补充。'
-    });
-  } else {
-    steps.push({
-      step: '第1步：图片类型过滤',
-      detail: '未指定图片类型，跳过此步骤',
-      beforeCount: candidates.length,
-      note: ''
-    });
-  }
-
-  // Step 2: 型号完全对应
-  const inputModel = (params['型号'] || '').trim();
-  const inputModels = [];
-  if (inputModel) inputModels.push(...inputModel.split(/[,，、\s]+/).filter(m => m.trim()));
-  const inputModelsNorm = normalizeModels(inputModels.map(m => m.trim()));
-
-  const modelResults = [];
-  if (inputModelsNorm.length > 0) {
-    console.log('[取图匹配 v1.5] 入参型号:', inputModelsNorm);
-    for (const name of candidates) {
-      const imgModels = extractModels(name);
-      const imgModelsNorm = normalizeModels(imgModels);
-      console.log('[取图匹配 v1.5] 图片:', name, '→ 提取型号:', imgModelsNorm);
-
-      const missingModels = inputModelsNorm.filter(m => !imgModelsNorm.includes(m));
-      const extraModels = imgModelsNorm.filter(m => !inputModelsNorm.includes(m));
-      const isExactMatch = missingModels.length === 0 && extraModels.length === 0;
-
-      modelResults.push({
-        name: name,
-        imgModels: imgModelsNorm,
-        missingModels: missingModels,
-        extraModels: extraModels,
-        isMatch: isExactMatch
-      });
-    }
-
-    const matchedByModel = modelResults.filter(r => r.isMatch).map(r => r.name);
-    candidates = matchedByModel;
-
-    const detailLines = [];
-    detailLines.push('入参型号：' + (inputModelsNorm.length > 0 ? inputModelsNorm.join('、') : '无'));
-    detailLines.push('完全对应规则：图片名称中的型号必须与入参型号完全一致（不多不少）');
-
-    steps.push({
-      step: '第2步：型号完全对应过滤',
-      detail: detailLines.join('<br>'),
-      beforeCount: totalImages,
-      afterCount: candidates.length,
-      modelResults: modelResults
-    });
-  } else {
-    steps.push({
-      step: '第2步：型号完全对应过滤',
-      detail: '未指定型号，跳过此步骤',
-      beforeCount: candidates.length,
-      modelResults: []
-    });
-  }
-
-  // Step 3: 颜色、功能、规格关键词匹配打分
-  const color = (params['颜色'] || '').trim();
-  const func = (params['功能'] || '').trim();
-  const spec = (params['规格'] || '').trim();
-
-  let finalImage = null;
-  let scoringResults = [];
-
-  if (candidates.length > 0 && (color || func || spec)) {
-    let maxScore = -1;
-    for (const name of candidates) {
-      let score = 0;
-      const matchedKeywords = [];
-      if (color) {
-        const s = keywordMatch(name, color);
-        if (s > 0) matchedKeywords.push('颜色:' + color + '(' + s + '分)');
-        score += s;
-      }
-      if (func) {
-        const s = keywordMatch(name, func);
-        if (s > 0) matchedKeywords.push('功能:' + func + '(' + s + '分)');
-        score += s;
-      }
-      if (spec) {
-        const s = keywordMatch(name, spec);
-        if (s > 0) matchedKeywords.push('规格:' + spec + '(' + s + '分)');
-        score += s;
-      }
-      scoringResults.push({ name, score, matchedKeywords });
-      if (score > maxScore) {
-        maxScore = score;
-        finalImage = name;
-      }
-    }
-
-    const detailLines = [];
-    if (color) detailLines.push('颜色关键词：' + color);
-    if (func) detailLines.push('功能关键词：' + func);
-    if (spec) detailLines.push('规格关键词：' + spec);
-    detailLines.push('计分规则：每匹配中1个关键词得1分，取最高分图片');
-
-    steps.push({
-      step: '第3步：颜色/功能/规格关键词匹配打分',
-      detail: detailLines.join('<br>'),
-      beforeCount: candidates.length,
-      scoringResults: scoringResults,
-      maxScore: maxScore
-    });
-  } else if (candidates.length === 0) {
-    steps.push({
-      step: '第3步：颜色/功能/规格关键词匹配打分',
-      detail: '无候选图片进入此步骤',
-      beforeCount: 0,
-      scoringResults: []
-    });
-    finalImage = null;
-  } else if (candidates.length > 0 && candidates.length === 1) {
-    finalImage = candidates[0];
-    steps.push({
-      step: '第3步：颜色/功能/规格关键词匹配打分',
-      detail: '仅剩1张候选图片，无需打分，直接返回',
-      beforeCount: 1,
-      scoringResults: [{ name: candidates[0], score: '-', matchedKeywords: ['唯一候选'] }]
-    });
-  } else {
-    finalImage = candidates[candidates.length - 1];
-    steps.push({
-      step: '第3步：颜色/功能/规格关键词匹配打分',
-      detail: '未指定颜色/功能/规格关键词，返回最后一张候选图片',
-      beforeCount: candidates.length,
-      scoringResults: candidates.map(n => ({ name: n, score: '-', matchedKeywords: ['未打分'] }))
-    });
-  }
-
-  // Step 4: 结果判定
-  if (!finalImage) {
-    finalImage = '无';
-  }
-
-  steps.push({
-    step: '第4步：最终结果',
-    detail: finalImage === '无' ? '未匹配到符合规则的图片，返回"无"' : '匹配成功，返回最佳图片名称',
-    finalImage: finalImage
-  });
-
-  // Render results
-  renderResults(steps, finalImage, resultBody, resultBadge);
+  var output = M.matchPictures(params, imageNames);
+  console.log('[取图匹配 ' + M.VERSION + '] 结果:', output.result);
+  renderResults(output.steps, output.result, resultBody, resultBadge);
 }
 
 function renderResults(steps, finalImage, resultBody, resultBadge) {
-  let html = '';
+  var html = '';
 
   if (finalImage && finalImage !== '无') {
     html += '<div class="final-image">';
@@ -646,28 +466,30 @@ function renderResults(steps, finalImage, resultBody, resultBadge) {
   html += '<th>匹配详情</th>';
   html += '</tr></thead><tbody>';
 
-  for (const step of steps) {
+  for (var i = 0; i < steps.length; i++) {
+    var step = steps[i];
     html += '<tr>';
     html += '<td><strong>' + escapeHtml(step.step) + '</strong></td>';
     html += '<td style="font-size:12px;">' + step.detail + '</td>';
-
     html += '<td>';
+
     if (step.modelResults && step.modelResults.length > 0) {
-      const passCount = step.modelResults.filter(r => r.isMatch).length;
-      const failCount = step.modelResults.length - passCount;
+      var passCount = step.modelResults.filter(function(r) { return r.isMatch; }).length;
+      var failCount = step.modelResults.length - passCount;
       html += '<div style="margin-bottom:8px;">';
       html += '<span class="step-label pass">通过 ' + passCount + '</span> ';
       html += '<span class="step-label fail">淘汰 ' + failCount + '</span>';
       html += '</div>';
 
-      for (const mr of step.modelResults) {
+      for (var j = 0; j < step.modelResults.length; j++) {
+        var mr = step.modelResults[j];
         if (mr.isMatch) {
           html += '<div style="margin-bottom:6px;font-size:12px;">';
           html += '<span class="step-label pass">✓</span> ';
           html += '<span style="word-break:break-all;">' + escapeHtml(mr.name) + '</span>';
           html += '<div class="model-chips" style="margin-top:4px;">';
-          for (const m of mr.imgModels) {
-            html += '<span class="model-chip">' + escapeHtml(m) + '</span>';
+          for (var mi = 0; mi < mr.imgModels.length; mi++) {
+            html += '<span class="model-chip">' + escapeHtml(mr.imgModels[mi]) + '</span>';
           }
           html += '</div>';
           html += '</div>';
@@ -676,17 +498,17 @@ function renderResults(steps, finalImage, resultBody, resultBadge) {
           html += '<span class="step-label fail">✗</span> ';
           html += '<span style="word-break:break-all;color:#999;">' + escapeHtml(mr.name) + '</span>';
           html += '<div class="model-chips" style="margin-top:4px;">';
-          for (const m of mr.imgModels) {
-            html += '<span class="model-chip">' + escapeHtml(m) + '</span>';
+          for (var mj = 0; mj < mr.imgModels.length; mj++) {
+            html += '<span class="model-chip">' + escapeHtml(mr.imgModels[mj]) + '</span>';
           }
           if (mr.missingModels.length > 0) {
-            for (const m of mr.missingModels) {
-              html += '<span class="model-chip missing">缺:' + escapeHtml(m) + '</span>';
+            for (var mk = 0; mk < mr.missingModels.length; mk++) {
+              html += '<span class="model-chip missing">缺:' + escapeHtml(mr.missingModels[mk]) + '</span>';
             }
           }
           if (mr.extraModels.length > 0) {
-            for (const m of mr.extraModels) {
-              html += '<span class="model-chip extra">多:' + escapeHtml(m) + '</span>';
+            for (var me = 0; me < mr.extraModels.length; me++) {
+              html += '<span class="model-chip extra">多:' + escapeHtml(mr.extraModels[me]) + '</span>';
             }
           }
           html += '</div>';
@@ -696,8 +518,9 @@ function renderResults(steps, finalImage, resultBody, resultBadge) {
     }
 
     if (step.scoringResults && step.scoringResults.length > 0) {
-      for (const sr of step.scoringResults) {
-        const isBest = sr.name === finalImage;
+      for (var k = 0; k < step.scoringResults.length; k++) {
+        var sr = step.scoringResults[k];
+        var isBest = sr.name === finalImage;
         html += '<div style="margin-bottom:4px;font-size:12px;' + (isBest ? 'font-weight:600;' : '') + '">';
         html += isBest ? '<span class="step-label pass">★</span> ' : '<span style="color:#ccc;">○</span> ';
         html += '<span style="word-break:break-all;">' + escapeHtml(sr.name) + '</span>';
@@ -706,7 +529,7 @@ function renderResults(steps, finalImage, resultBody, resultBadge) {
         }
         if (sr.matchedKeywords && sr.matchedKeywords.length > 0) {
           html += '<div style="margin-top:2px;color:#888;">';
-          html += sr.matchedKeywords.map(k => '<span class="match-keyword">' + escapeHtml(k) + '</span>').join(' / ');
+          html += sr.matchedKeywords.map(function(kw) { return '<span class="match-keyword">' + escapeHtml(kw) + '</span>'; }).join(' / ');
           html += '</div>';
         }
         html += '</div>';
@@ -739,7 +562,7 @@ function renderResults(steps, finalImage, resultBody, resultBadge) {
 }
 
 function escapeHtml(str) {
-  const div = document.createElement('div');
+  var div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
 }

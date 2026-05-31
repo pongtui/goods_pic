@@ -14,6 +14,7 @@
 | v1.3 | 2026-05-30 | - | 修复型号正则：支持 LS387S10-D 等多段字母数字型号 |
 | v1.4 | 2026-05-30 | - | 修复正则误匹配：i标志导致 x4-S 等被错误识别为型号 |
 | v1.5 | 2026-05-30 | - | 修复正则：连字符前支持字母结尾（RQ3R-A 中的 R） |
+| v1.6 | 2026-05-30 | - | 架构重构：匹配逻辑抽取到 goods_pic_matcher.js，HTML 仅做 UI |
 
 ---
 
@@ -21,17 +22,18 @@
 
 ```
 goods_pic/
+├── goods_pic_matcher.js          ← 🧠 核心引擎（唯一逻辑来源，浏览器 + Node.js 通用）
+├── goods_pic_matcher.html        ← 👁️ 可视化验证（引入 .js，仅做 UI 渲染）
 ├── .trae/skills/goods-pic-matcher/
-│   └── SKILL.md                 ← Agent Skill 定义（规则引擎，后续可部署为 API）
-├── goods_pic_matcher.html       ← 可视化验证工具（前端页面，用于快速验证规则）
-├── goods_pic_optimization_log.md ← 本文件（开发优化记录）
-└── goods_pic_error_log.md       ← 取图错误场景记录
+│   └── SKILL.md                  ← 📋 Agent Skill 规则定义文档
+├── goods_pic_optimization_log.md ← 📝 开发优化记录
+└── goods_pic_error_log.md        ← 🐛 错误场景记录
 ```
 
 **架构说明**：
-- `SKILL.md` 是核心规则定义文件，包含完整的匹配算法、输入输出规范、边界情况处理。后续可据此实现服务端 API
-- `goods_pic_matcher.html` 是配套的可视化验证页面，在浏览器中打开即可快速测试规则，所见即所得
-- 两套文件（优化记录 + 错误记录）分别记录开发过程中的经验教训和实际错误案例
+- `goods_pic_matcher.js`：唯一逻辑来源，UMD 格式，同时支持浏览器 `<script>` 和 Node.js `require()`
+- `goods_pic_matcher.html`：纯 UI 层，通过 `GoodsPicMatcher.matchPictures()` 调用引擎，仅负责渲染
+- 修改匹配规则时**只需改 `goods_pic_matcher.js` 一个文件**
 
 ---
 
@@ -193,6 +195,25 @@ goods_pic/
 - **影响范围**：
   - `goods_pic_matcher.html`：MODEL_PATTERN
   - `SKILL.md`：正则说明
+
+---
+
+### 优化 #12：架构重构 — 匹配逻辑与 UI 分离
+
+- **日期**：2026-05-30
+- **问题描述**：匹配逻辑（正则、4步算法）内嵌在 HTML 的 `<script>` 标签中，导致每次修改规则需要同时修改 HTML 和 SKILL.md 两个文件，容易出现不一致
+- **解决方案**：
+  - 创建独立的 `goods_pic_matcher.js`，使用 UMD 格式（通用模块定义），同时支持浏览器 `<script>` 标签和 Node.js `require()`
+  - HTML 通过 `<script src="goods_pic_matcher.js"></script>` 引入，通过 `GoodsPicMatcher.matchPictures()` 调用
+  - HTML 只保留 UI 渲染代码（renderResults、escapeHtml、clearAll、loadExample）
+- **收益**：
+  - 修改匹配规则只需改 `goods_pic_matcher.js` 一个文件
+  - 后续部署为 Node.js API 时，直接 `require('./goods_pic_matcher.js')` 即可复用
+  - 前端页面和 API 使用同一份逻辑，确保一致性
+- **影响范围**：
+  - 新建 `goods_pic_matcher.js`
+  - 重构 `goods_pic_matcher.html`（删除 ~170 行逻辑，新增 1 行引用）
+  - 更新 `SKILL.md` 底部实现文件说明
 
 ---
 

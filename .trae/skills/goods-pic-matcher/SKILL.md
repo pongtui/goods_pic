@@ -278,8 +278,11 @@ RQ3R-A+LS387S10-D-白图-SKU-(1).jpg
 
 ---
 
-## 可视化验证工具
+## 实现文件
 
-配套的前端验证页面位于：`goods_pic_matcher.html`
-
-直接在浏览器打开该页面，输入 JSON 参数和图片名称，点击"开始匹配"即可看到每一步的详细匹配过程。该页面用于快速验证规则是否正确。
+- **核心引擎**：`goods_pic_matcher.js` — 纯逻辑模块，无 DOM 依赖，可同时在浏览器和 Node.js 中使用
+  - 浏览器：`<script src="goods_pic_matcher.js"></script>` → 挂载到 `window.GoodsPicMatcher`
+  - Node.js：`const { matchPictures } = require('./goods_pic_matcher.js');`
+  - 修改匹配规则只需修改此一个文件
+- **可视化验证**：`goods_pic_matcher.html` — 前端页面，引入 `goods_pic_matcher.js`，仅负责 UI 展示和人工验证
+  - 在浏览器直接打开，输入 JSON 参数和图片名称即可看到每步匹配过程
